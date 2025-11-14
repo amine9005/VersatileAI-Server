@@ -4,6 +4,7 @@ import aiRouter from "./routes/aiRouter";
 import cors from "cors";
 import dotenv from "dotenv";
 import connectCloudinary from "./configs/cloudinary";
+import userRouter from "./routes/userRouter";
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ app.use(clerkMiddleware());
 
 app.use(requireAuth());
 
+app.use("/api/user", userRouter);
 app.use("/api/ai", aiRouter);
 
 app.use("/", (req: Request, res: Response) => {
