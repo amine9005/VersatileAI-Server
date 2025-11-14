@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import { v2 as cloudinary } from "cloudinary";
 import axios from "axios";
 import * as fs from "node:fs";
+import pdf from "pdf-parse-new";
 
 type aiResponse = {
   parts: [
@@ -245,7 +246,7 @@ export const removeObjectFromImage = async (
   req: RequestWithClerk,
   res: Response
 ) => {
-  console.log("generateImage called");
+  console.log("Remove Object From Image called");
   try {
     const { userId } = getAuth(req);
     const image = req.file;
@@ -284,6 +285,61 @@ export const removeObjectFromImage = async (
     // }
 
     return res.status(200).json({ success: true, content: secure_url });
+  } catch (error) {
+    console.log("Error in generateArticle ", error);
+    return res.status(500).json({ success: false, message: error });
+  }
+};
+export const reviewResume = async (req: RequestWithClerk, res: Response) => {
+  console.log("review Resume called");
+  try {
+    const { userId } = getAuth(req);
+    const resume = req.file;
+    const plan = req.plan;
+
+    if (plan !== "premium") {
+      return res.status(403).json({
+        success: false,
+        message: "Become a premium user to generate images :).",
+      });
+    }
+
+    if (resume.size > 5 * 1024 * 1024) {
+      res.status(400).json({
+        success: false,
+        message: "Resume file size exceeds allowed size 5MB",
+      });
+    }
+
+    const dataBuffer = fs.readFileSync(resume.path);
+
+    const pdfData = await pdf(dataBuffer);
+
+    const prompt = `Review the following resume and provide constructive feedback on its strengths , weaknesses and areas for improvement. Resume Content\n\n: ${pdfData.text}`;
+
+    // fs.writeFileSync("gemini-native-image.png", base64Image);
+    // console.log("Image saved as gemini-native-image.png");
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.5,
+        maxOutputTokens: 1000,
+      },
+    });
+
+    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, 'review the uploaded resume', ${response.text},'resume-review');`;
+
+    // if (plan !== "premium") {
+    //   await clerkClient.users.updateUserMetadata(userId, {
+    //     privateMetadata: {
+    //       free_usage: free_usage + 1,
+    //     },
+    //   });
+    // }
+
+    return res.status(200).json({ success: true, content: response });
   } catch (error) {
     console.log("Error in generateArticle ", error);
     return res.status(500).json({ success: false, message: error });
