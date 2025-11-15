@@ -9,15 +9,6 @@ import axios from "axios";
 import * as fs from "node:fs";
 import pdf from "pdf-parse-new";
 
-type aiResponse = {
-  parts: [
-    {
-      text: string;
-      inlineData: { mimeType: string; data: string };
-    },
-  ];
-};
-
 dotenv.config();
 
 // The client gets the API key from the environment variable `GEMINI_API_KEY`.
@@ -43,6 +34,7 @@ export const generateArticle = async (req: RequestWithClerk, res: Response) => {
     const plan = req.plan;
     const free_usage = req.free_usage;
 
+    const command = `generate an detailed article based on this: ${prompt}`;
     if (plan !== "premium" && free_usage >= 10) {
       return res.status(403).json({
         success: false,
@@ -52,7 +44,7 @@ export const generateArticle = async (req: RequestWithClerk, res: Response) => {
 
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: prompt,
+      contents: command,
       config: {
         temperature: 0.7,
         maxOutputTokens: length,
@@ -62,7 +54,7 @@ export const generateArticle = async (req: RequestWithClerk, res: Response) => {
 
     // console.log("plan: ", plan, "free_usage: ", free_usage);
 
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${response.text},'article');`;
+    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${command}, ${response.text},'article');`;
 
     if (plan !== "premium") {
       await clerkClient.users.updateUserMetadata(userId, {
@@ -165,16 +157,28 @@ export const generateImage = async (req: RequestWithClerk, res: Response) => {
     // console.log("response: ", response);
 
     const candidates = response.candidates;
-    // console.log("content: ", candidates.content);
+    // console.log("content: ", candidates);
     const { text } = candidates[0].content.parts[0];
     const { inlineData } = candidates[0].content.parts[1];
 
     // console.log("text: ", text, "\ninlineData: ", inlineData);
 
-    // const image = Buffer.from(inlineData.data, "base64");
     const base64Image = `data:image/png;base64,${Buffer.from(inlineData.data, "base64").toString("base64")}`;
 
-    // fs.writeFileSync("gemini-native-image.png", base64Image);
+    // const response = await ai.models.generateImages({
+    //   model: "imagen-3.0-generate-002",
+    //   prompt: prompt,
+    //   config: {
+    //     numberOfImages: 1,
+    //   },
+    // });
+
+    // const inlineData = response.generatedImages[0].image.imageBytes;
+
+    // // const image = Buffer.from(inlineData.data, "base64");
+    // const base64Image = `data:image/png;base64,${Buffer.from(inlineData, "base64").toString("base64")}`;
+
+    // // fs.writeFileSync("gemini-native-image.png", base64Image);
     // console.log("Image saved as gemini-native-image.png");
 
     const { secure_url } = await cloudinary.uploader.upload(base64Image);
@@ -200,7 +204,7 @@ export const removeImageBackground = async (
   req: RequestWithClerk,
   res: Response
 ) => {
-  console.log("generateImage called");
+  console.log("Remove Image Background called");
   try {
     const { userId } = getAuth(req);
     const image = req.file;
@@ -274,7 +278,7 @@ export const removeObjectFromImage = async (
       resourceType: "image",
     });
 
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${secure_url},'image');`;
+    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, 'Remove the ${prompt} from image', ${secure_url},'image');`;
 
     // if (plan !== "premium") {
     //   await clerkClient.users.updateUserMetadata(userId, {
@@ -314,8 +318,8 @@ export const reviewResume = async (req: RequestWithClerk, res: Response) => {
     const dataBuffer = fs.readFileSync(resume.path);
 
     const pdfData = await pdf(dataBuffer);
-
     const prompt = `Review the following resume and provide constructive feedback on its strengths , weaknesses and areas for improvement. Resume Content\n\n: ${pdfData.text}`;
+    // console.log({ prompt });
 
     // fs.writeFileSync("gemini-native-image.png", base64Image);
     // console.log("Image saved as gemini-native-image.png");
@@ -324,12 +328,12 @@ export const reviewResume = async (req: RequestWithClerk, res: Response) => {
       model: "gemini-2.0-flash",
       contents: prompt,
       config: {
-        temperature: 0.5,
-        maxOutputTokens: 1000,
+        temperature: 0.7,
+        maxOutputTokens: 2000,
       },
     });
 
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, 'review the uploaded resume', ${response.text},'resume-review');`;
+    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${"review the uploaded resume"}, ${response.text},'resume-review');`;
 
     // if (plan !== "premium") {
     //   await clerkClient.users.updateUserMetadata(userId, {
@@ -339,7 +343,7 @@ export const reviewResume = async (req: RequestWithClerk, res: Response) => {
     //   });
     // }
 
-    return res.status(200).json({ success: true, content: response });
+    return res.status(200).json({ success: true, content: response.text });
   } catch (error) {
     console.log("Error in generateArticle ", error);
     return res.status(500).json({ success: false, message: error });

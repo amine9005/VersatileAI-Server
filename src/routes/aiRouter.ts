@@ -6,12 +6,13 @@ import {
   generateImage,
   removeImageBackground,
   removeObjectFromImage,
+  reviewResume,
 } from "../controllers/aiController";
 import { upload } from "../configs/multer";
 
 const router = express.Router();
 
-router.post("/generate-article", auth, generateArticle);
+router.post("/write-article", auth, generateArticle);
 router.post("/generate-blog-titles", auth, generateBlogTitles);
 router.post("/generate-image", auth, generateImage);
 router.post(
@@ -26,11 +27,6 @@ router.post(
   auth,
   removeObjectFromImage
 );
-router.post(
-  "/review-resume",
-  upload.single("resume"),
-  auth,
-  removeObjectFromImage
-);
+router.post("/review-resume", upload.single("resume"), auth, reviewResume);
 
 export default router;

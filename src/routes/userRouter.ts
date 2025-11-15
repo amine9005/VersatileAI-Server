@@ -8,8 +8,8 @@ import { auth } from "../middlewares/auth";
 
 const router = express.Router();
 
-router.get("/get-published-creations", auth, getPublishedCreations);
 router.get("/get-user-creations", auth, getUserCreations);
+router.get("/get-published-creations", auth, getPublishedCreations);
 router.put("/toggle-liked-creations", auth, toggleLikedCreations);
 
 export default router;

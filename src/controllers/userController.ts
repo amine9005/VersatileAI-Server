@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { getAuth } from "@clerk/express";
 import sql from "../configs/db";
 export const getUserCreations = async (req: Request, res: Response) => {
+  console.log("getUserCreations called");
   try {
     const { userId } = getAuth(req);
     const creations =
@@ -14,11 +15,12 @@ export const getUserCreations = async (req: Request, res: Response) => {
   }
 };
 
-export const getPublishedCreations = async (req: Request, res: Response) => {
+export const toggleLikedCreations = async (req: Request, res: Response) => {
+  console.log("toggleLikedCreations called");
   try {
     const { userId } = getAuth(req);
     const { id } = req.body;
-
+    console.log("id: ", id, "userId: ", userId);
     const [creations] =
       await sql`SELECT * FROM creations WHERE id = ${id} ORDER BY created_at DESC;`;
 
@@ -51,7 +53,8 @@ export const getPublishedCreations = async (req: Request, res: Response) => {
   }
 };
 
-export const toggleLikedCreations = async (req: Request, res: Response) => {
+export const getPublishedCreations = async (req: Request, res: Response) => {
+  console.log("getPublishedCreations called");
   try {
     const creations =
       await sql`SELECT * FROM creations WHERE publish = true ORDER BY created_at DESC;`;
