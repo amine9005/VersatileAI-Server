@@ -12,9 +12,10 @@ const app = express();
 
 app.use(
   cors({
-    origin: process.env.ALLOWED_ORIGIN_URL,
+    origin: [process.env.ALLOWED_ORIGIN_URL],
   })
 );
+
 app.use(express.json());
 app.use(clerkMiddleware());
 
