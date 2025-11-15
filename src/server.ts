@@ -17,16 +17,16 @@ app.use(
 );
 
 app.use(express.json());
+
+app.use("/", (req: Request, res: Response) => {
+  res.status(200).json({ message: "Server is running" });
+});
 app.use(clerkMiddleware());
 
 app.use(requireAuth());
 
 app.use("/api/user", userRouter);
 app.use("/api/ai", aiRouter);
-
-app.use("/", (req: Request, res: Response) => {
-  res.status(200).json({ message: "Server is running" });
-});
 
 // app.get("/x", (req: Request, res: Response) => {
 //   res.status(404).json({ message: "Resource Not Found " });
