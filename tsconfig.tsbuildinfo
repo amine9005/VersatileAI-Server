@@ -1,0 +1,1 @@
+{"root":["./src/server.ts","./src/configs/cloudinary.ts","./src/configs/db.ts","./src/configs/multer.ts","./src/controllers/aicontroller.ts","./src/controllers/usercontroller.ts","./src/lib/types.ts","./src/middlewares/auth.ts","./src/routes/airouter.ts","./src/routes/userrouter.ts"],"version":"5.9.3"}
