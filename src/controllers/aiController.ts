@@ -1,18 +1,19 @@
 import { Response } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
-import { GenerateContentResponse, GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 import sql from "../configs/db";
 import { RequestWithClerk } from "../lib/types";
 import dotenv from "dotenv";
 import { v2 as cloudinary } from "cloudinary";
-import axios from "axios";
 import * as fs from "node:fs";
 import pdf from "pdf-parse-new";
+import { InferenceClient } from "@huggingface/inference";
 
 dotenv.config();
 
 // The client gets the API key from the environment variable `GEMINI_API_KEY`.
 const ai = new GoogleGenAI({});
+const client = new InferenceClient(process.env.HUGGING_FACE_API_KEY);
 
 /**
  * Generates an article based on the provided prompt and length.
@@ -93,6 +94,7 @@ export const generateBlogTitles = async (
     const { prompt } = req.body;
     const plan = req.plan;
     const free_usage = req.free_usage;
+    const command = `generate titles for this subject: ${prompt}`;
 
     if (plan !== "premium" && free_usage >= 10) {
       return res.status(403).json({
@@ -103,13 +105,17 @@ export const generateBlogTitles = async (
     //google gemini api
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: prompt,
+      contents: command,
       config: {
         temperature: 0.7,
-        maxOutputTokens: 100,
+        maxOutputTokens: 500,
       },
     });
-    // console.log("AI response: ", response.text);
+    console.log("AI response: ", JSON.stringify(response));
+    // const candidates = response.candidates;
+    // const content = candidates[0].content;
+
+    // console.log("AI text: ", content);
 
     // console.log("plan: ", plan, "free_usage: ", free_usage);
 
@@ -145,57 +151,26 @@ export const generateImage = async (req: RequestWithClerk, res: Response) => {
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-preview-image-generation",
-      contents: prompt,
-      config: {
-        responseModalities: [Modality.TEXT, Modality.IMAGE],
-      },
+    const response = await client.textToImage({
+      provider: "auto",
+      model: "black-forest-labs/FLUX.1-schnell",
+      inputs: prompt,
+      parameters: { num_inference_steps: 5 },
     });
 
-    // console.log("typeof response ", typeof response);
-    // console.log("response: ", response);
+    const image = response as unknown as Blob;
 
-    const candidates = response.candidates;
-    // console.log("content: ", candidates);
-    const { text } = candidates[0].content.parts[0];
-    const { inlineData } = candidates[0].content.parts[1];
+    const arrayBuffer = await image.arrayBuffer();
 
-    // console.log("text: ", text, "\ninlineData: ", inlineData);
-
-    const base64Image = `data:image/png;base64,${Buffer.from(inlineData.data, "base64").toString("base64")}`;
-
-    // const response = await ai.models.generateImages({
-    //   model: "imagen-3.0-generate-002",
-    //   prompt: prompt,
-    //   config: {
-    //     numberOfImages: 1,
-    //   },
-    // });
-
-    // const inlineData = response.generatedImages[0].image.imageBytes;
-
-    // // const image = Buffer.from(inlineData.data, "base64");
-    // const base64Image = `data:image/png;base64,${Buffer.from(inlineData, "base64").toString("base64")}`;
-
-    // // fs.writeFileSync("gemini-native-image.png", base64Image);
-    // console.log("Image saved as gemini-native-image.png");
+    const base64Image = `data:image/png;base64,${Buffer.from(arrayBuffer).toString("base64")}`;
 
     const { secure_url } = await cloudinary.uploader.upload(base64Image);
 
     await sql` INSERT INTO creations (user_id, prompt, content, type, publish) VALUES (${userId}, ${prompt}, ${secure_url},'image',${publish ?? false});`;
 
-    // if (plan !== "premium") {
-    //   await clerkClient.users.updateUserMetadata(userId, {
-    //     privateMetadata: {
-    //       free_usage: free_usage + 1,
-    //     },
-    //   });
-    // }
-
     return res.status(200).json({ success: true, content: secure_url });
   } catch (error) {
-    console.log("Error in generateArticle ", error);
+    console.log("Error in Generate Image ", error);
     return res.status(500).json({ success: false, message: error });
   }
 };
@@ -277,8 +252,8 @@ export const removeObjectFromImage = async (
       ],
       resourceType: "image",
     });
-
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, 'Remove the ${prompt} from image', ${secure_url},'image');`;
+    const prompt2 = `Remove the ${prompt} from image`;
+    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt2}, ${secure_url},'image');`;
 
     // if (plan !== "premium") {
     //   await clerkClient.users.updateUserMetadata(userId, {

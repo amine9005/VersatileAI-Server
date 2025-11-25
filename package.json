@@ -27,6 +27,7 @@
   "dependencies": {
     "@clerk/express": "^1.7.48",
     "@google/genai": "^1.29.0",
+    "@huggingface/inference": "^4.13.3",
     "@neondatabase/serverless": "^1.0.2",
     "@types/axios": "^0.14.4",
     "@types/multer": "^2.0.0",
