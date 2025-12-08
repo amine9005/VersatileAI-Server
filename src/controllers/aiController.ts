@@ -44,7 +44,7 @@ export const generateArticle = async (req: RequestWithClerk, res: Response) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemma-3-27b-it",
       contents: command,
       config: {
         temperature: 0.7,
@@ -104,7 +104,7 @@ export const generateBlogTitles = async (
     }
     //google gemini api
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemma-3-27b-it",
       contents: command,
       config: {
         temperature: 0.7,
@@ -300,7 +300,7 @@ export const reviewResume = async (req: RequestWithClerk, res: Response) => {
     // console.log("Image saved as gemini-native-image.png");
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemma-3-27b-it",
       contents: prompt,
       config: {
         temperature: 0.7,
