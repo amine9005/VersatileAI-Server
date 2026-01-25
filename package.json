@@ -29,6 +29,7 @@
     "@google/genai": "^1.29.0",
     "@huggingface/inference": "^4.13.3",
     "@neondatabase/serverless": "^1.0.2",
+    "@openrouter/sdk": "^0.4.0",
     "@types/axios": "^0.14.4",
     "@types/multer": "^2.0.0",
     "@types/pdf-parse": "^1.1.5",
