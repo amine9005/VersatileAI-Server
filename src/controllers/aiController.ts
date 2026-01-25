@@ -7,13 +7,16 @@ import dotenv from "dotenv";
 import { v2 as cloudinary } from "cloudinary";
 import * as fs from "node:fs";
 import pdf from "pdf-parse-new";
-import { InferenceClient } from "@huggingface/inference";
+// import { InferenceClient } from "@huggingface/inference";
+import { OpenRouter } from "@openrouter/sdk";
 
-dotenv.config();
+const openrouter = new OpenRouter({
+	apiKey: process.env.OPEN_ROUTER_API_KEY,
+});
 
 // The client gets the API key from the environment variable `GEMINI_API_KEY`.
 const ai = new GoogleGenAI({});
-const client = new InferenceClient(process.env.HUGGING_FACE_API_KEY);
+// const client = new InferenceClient(process.env.HUGGING_FACE_API_KEY);
 
 /**
  * Generates an article based on the provided prompt and length.
@@ -28,48 +31,48 @@ const client = new InferenceClient(process.env.HUGGING_FACE_API_KEY);
  * @returns {Promise<Response>} - A promise resolving to the response object.
  */
 export const generateArticle = async (req: RequestWithClerk, res: Response) => {
-  console.log("generateArticle called");
-  try {
-    const { userId } = getAuth(req);
-    const { prompt, length } = req.body;
-    const plan = req.plan;
-    const free_usage = req.free_usage;
+	console.log("generateArticle called");
+	try {
+		const { userId } = getAuth(req);
+		const { prompt, length } = req.body;
+		const plan = req.plan;
+		const free_usage = req.free_usage;
 
-    const command = `generate an detailed article based on this: ${prompt}`;
-    if (plan !== "premium" && free_usage >= 10) {
-      return res.status(403).json({
-        success: false,
-        message: "You have reached your free usage limit.",
-      });
-    }
+		const command = `generate an detailed article based on this: ${prompt}`;
+		if (plan !== "premium" && free_usage >= 10) {
+			return res.status(403).json({
+				success: false,
+				message: "You have reached your free usage limit.",
+			});
+		}
 
-    const response = await ai.models.generateContent({
-      model: "gemma-3-27b-it",
-      contents: command,
-      config: {
-        temperature: 0.7,
-        maxOutputTokens: length,
-      },
-    });
-    // console.log("AI response: ", response.text);
+		const response = await ai.models.generateContent({
+			model: "gemma-3-27b-it",
+			contents: command,
+			config: {
+				temperature: 0.7,
+				maxOutputTokens: length,
+			},
+		});
+		// console.log("AI response: ", response.text);
 
-    // console.log("plan: ", plan, "free_usage: ", free_usage);
+		// console.log("plan: ", plan, "free_usage: ", free_usage);
 
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${command}, ${response.text},'article');`;
+		await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${command}, ${response.text},'article');`;
 
-    if (plan !== "premium") {
-      await clerkClient.users.updateUserMetadata(userId, {
-        privateMetadata: {
-          free_usage: free_usage + 1,
-        },
-      });
-    }
+		if (plan !== "premium") {
+			await clerkClient.users.updateUserMetadata(userId, {
+				privateMetadata: {
+					free_usage: free_usage + 1,
+				},
+			});
+		}
 
-    return res.status(200).json({ success: true, content: response.text });
-  } catch (error) {
-    console.log("Error in generateArticle ", error);
-    return res.status(500).json({ success: false, message: error });
-  }
+		return res.status(200).json({ success: true, content: response.text });
+	} catch (error) {
+		console.log("Error in generateArticle ", error);
+		return res.status(500).json({ success: false, message: error });
+	}
 };
 
 /**
@@ -85,242 +88,265 @@ export const generateArticle = async (req: RequestWithClerk, res: Response) => {
  * @returns {Promise<Response>} - A promise resolving to the response object.
  */
 export const generateBlogTitles = async (
-  req: RequestWithClerk,
-  res: Response
+	req: RequestWithClerk,
+	res: Response,
 ) => {
-  console.log("generateBlogTitles called");
-  try {
-    const { userId } = getAuth(req);
-    const { prompt } = req.body;
-    const plan = req.plan;
-    const free_usage = req.free_usage;
-    const command = `generate titles for this subject: ${prompt}`;
+	console.log("generateBlogTitles called");
+	try {
+		const { userId } = getAuth(req);
+		const { prompt } = req.body;
+		const plan = req.plan;
+		const free_usage = req.free_usage;
+		const command = `generate titles for this subject: ${prompt}`;
 
-    if (plan !== "premium" && free_usage >= 10) {
-      return res.status(403).json({
-        success: false,
-        message: "You have reached your free usage limit.",
-      });
-    }
-    //google gemini api
-    const response = await ai.models.generateContent({
-      model: "gemma-3-27b-it",
-      contents: command,
-      config: {
-        temperature: 0.7,
-        maxOutputTokens: 500,
-      },
-    });
-    console.log("AI response: ", JSON.stringify(response));
-    // const candidates = response.candidates;
-    // const content = candidates[0].content;
+		if (plan !== "premium" && free_usage >= 10) {
+			return res.status(403).json({
+				success: false,
+				message: "You have reached your free usage limit.",
+			});
+		}
+		//google gemini api
+		const response = await ai.models.generateContent({
+			model: "gemma-3-27b-it",
+			contents: command,
+			config: {
+				temperature: 0.7,
+				maxOutputTokens: 500,
+			},
+		});
+		console.log("AI response: ", JSON.stringify(response));
+		// const candidates = response.candidates;
+		// const content = candidates[0].content;
 
-    // console.log("AI text: ", content);
+		// console.log("AI text: ", content);
 
-    // console.log("plan: ", plan, "free_usage: ", free_usage);
+		// console.log("plan: ", plan, "free_usage: ", free_usage);
 
-    //add to database 'neon'
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${response.text},'blog-title');`;
+		//add to database 'neon'
+		await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt}, ${response.text},'blog-title');`;
 
-    if (plan !== "premium") {
-      await clerkClient.users.updateUserMetadata(userId, {
-        privateMetadata: {
-          free_usage: free_usage + 1,
-        },
-      });
-    }
+		if (plan !== "premium") {
+			await clerkClient.users.updateUserMetadata(userId, {
+				privateMetadata: {
+					free_usage: free_usage + 1,
+				},
+			});
+		}
 
-    return res.status(200).json({ success: true, content: response.text });
-  } catch (error) {
-    console.log("Error in generateArticle ", error);
-    return res.status(500).json({ success: false, message: error });
-  }
+		return res.status(200).json({ success: true, content: response.text });
+	} catch (error) {
+		console.log("Error in generateArticle ", error);
+		return res.status(500).json({ success: false, message: error });
+	}
 };
 
 export const generateImage = async (req: RequestWithClerk, res: Response) => {
-  console.log("generateImage called");
-  try {
-    const { userId } = getAuth(req);
-    const { prompt, publish } = req.body;
-    const plan = req.plan;
+	console.log("generateImage called");
+	try {
+		const { userId } = getAuth(req);
+		const { prompt, publish } = req.body;
+		const plan = req.plan;
 
-    if (plan !== "premium") {
-      return res.status(403).json({
-        success: false,
-        message: "Become a premium user to generate images :).",
-      });
-    }
+		if (plan !== "premium") {
+			return res.status(403).json({
+				success: false,
+				message: "Become a premium user to generate images :).",
+			});
+		}
 
-    const response = await client.textToImage({
-      provider: "auto",
-      model: "black-forest-labs/FLUX.1-schnell",
-      inputs: prompt,
-      parameters: { num_inference_steps: 5 },
-    });
+		// const response = await client.textToImage({
+		// 	provider: "auto",
+		// 	model: "black-forest-labs/FLUX.1-schnell",
+		// 	inputs: prompt,
+		// 	parameters: { num_inference_steps: 5 },
+		// });
 
-    const image = response as unknown as Blob;
+		// const image = response as unknown as Blob;
 
-    const arrayBuffer = await image.arrayBuffer();
+		// const arrayBuffer = await image.arrayBuffer();
 
-    const base64Image = `data:image/png;base64,${Buffer.from(arrayBuffer).toString("base64")}`;
+		const result = await openrouter.chat.send({
+			model: "black-forest-labs/flux.2-klein-4b",
+			messages: [
+				{
+					role: "user",
+					content: prompt,
+				},
+			],
+			modalities: ["image", "text"],
+		});
 
-    const { secure_url } = await cloudinary.uploader.upload(base64Image);
+		let imageUrl: string | null = null;
+		const message = result.choices[0].message;
+		if (message.images) {
+			message.images.forEach((image, index) => {
+				imageUrl = image.imageUrl.url;
+				// console.log(
+				// 	`Generated image ${index + 1}: ${imageUrl.substring(0, 50)}...`,
+				// );
+			});
+		}
+		// const base64Image = `data:image/png;base64,${Buffer.from(arrayBuffer).toString("base64")}`;
 
-    await sql` INSERT INTO creations (user_id, prompt, content, type, publish) VALUES (${userId}, ${prompt}, ${secure_url},'image',${publish ?? false});`;
+		// const { secure_url } = await cloudinary.uploader.upload(base64Image);
 
-    return res.status(200).json({ success: true, content: secure_url });
-  } catch (error) {
-    console.log("Error in Generate Image ", error);
-    return res.status(500).json({ success: false, message: error });
-  }
+		if (!imageUrl) {
+			throw new Error("No image generated");
+		}
+		await sql` INSERT INTO creations (user_id, prompt, content, type, publish) VALUES (${userId}, ${prompt}, ${imageUrl},'image',${publish ?? false});`;
+
+		return res.status(200).json({ success: true, content: imageUrl });
+	} catch (error) {
+		console.log("Error in Generate Image ", error);
+		return res.status(500).json({ success: false, message: error });
+	}
 };
 
 export const removeImageBackground = async (
-  req: RequestWithClerk,
-  res: Response
+	req: RequestWithClerk,
+	res: Response,
 ) => {
-  console.log("Remove Image Background called");
-  try {
-    const { userId } = getAuth(req);
-    const image = req.file;
-    const plan = req.plan;
+	console.log("Remove Image Background called");
+	try {
+		const { userId } = getAuth(req);
+		const image = req.file;
+		const plan = req.plan;
 
-    if (plan !== "premium") {
-      return res.status(403).json({
-        success: false,
-        message: "Become a premium user to generate images :).",
-      });
-    }
+		if (plan !== "premium") {
+			return res.status(403).json({
+				success: false,
+				message: "Become a premium user to generate images :).",
+			});
+		}
 
-    // fs.writeFileSync("gemini-native-image.png", base64Image);
-    // console.log("Image saved as gemini-native-image.png");
+		// fs.writeFileSync("gemini-native-image.png", base64Image);
+		// console.log("Image saved as gemini-native-image.png");
 
-    const { secure_url } = await cloudinary.uploader.upload(image.path, {
-      transformation: [
-        {
-          effect: "background_removal",
-          background_removal: "remove_the_background",
-        },
-      ],
-    });
+		const { secure_url } = await cloudinary.uploader.upload(image.path, {
+			transformation: [
+				{
+					effect: "background_removal",
+					background_removal: "remove_the_background",
+				},
+			],
+		});
 
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, 'Remove background from image', ${secure_url},'image');`;
+		await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, 'Remove background from image', ${secure_url},'image');`;
 
-    // if (plan !== "premium") {
-    //   await clerkClient.users.updateUserMetadata(userId, {
-    //     privateMetadata: {
-    //       free_usage: free_usage + 1,
-    //     },
-    //   });
-    // }
+		// if (plan !== "premium") {
+		//   await clerkClient.users.updateUserMetadata(userId, {
+		//     privateMetadata: {
+		//       free_usage: free_usage + 1,
+		//     },
+		//   });
+		// }
 
-    return res.status(200).json({ success: true, content: secure_url });
-  } catch (error) {
-    console.log("Error in generateArticle ", error);
-    return res.status(500).json({ success: false, message: error });
-  }
+		return res.status(200).json({ success: true, content: secure_url });
+	} catch (error) {
+		console.log("Error in generateArticle ", error);
+		return res.status(500).json({ success: false, message: error });
+	}
 };
 
 export const removeObjectFromImage = async (
-  req: RequestWithClerk,
-  res: Response
+	req: RequestWithClerk,
+	res: Response,
 ) => {
-  console.log("Remove Object From Image called");
-  try {
-    const { userId } = getAuth(req);
-    const image = req.file;
-    const plan = req.plan;
-    const { prompt } = req.body;
+	console.log("Remove Object From Image called");
+	try {
+		const { userId } = getAuth(req);
+		const image = req.file;
+		const plan = req.plan;
+		const { prompt } = req.body;
 
-    if (plan !== "premium") {
-      return res.status(403).json({
-        success: false,
-        message: "Become a premium user to generate images :).",
-      });
-    }
+		if (plan !== "premium") {
+			return res.status(403).json({
+				success: false,
+				message: "Become a premium user to generate images :).",
+			});
+		}
 
-    // fs.writeFileSync("gemini-native-image.png", base64Image);
-    // console.log("Image saved as gemini-native-image.png");
+		// fs.writeFileSync("gemini-native-image.png", base64Image);
+		// console.log("Image saved as gemini-native-image.png");
 
-    const { public_id } = await cloudinary.uploader.upload(image.path);
+		const { public_id } = await cloudinary.uploader.upload(image.path);
 
-    const secure_url = await cloudinary.url(public_id, {
-      transformation: [
-        {
-          effect: `gen_remove:${prompt}`,
-        },
-      ],
-      resourceType: "image",
-    });
-    const prompt2 = `Remove the ${prompt} from image`;
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt2}, ${secure_url},'image');`;
+		const secure_url = await cloudinary
+			.image(public_id, {
+				effect: `gen_remove:${prompt}`,
+			})
+			.replace("<img src='", "")
+			.replace("/>", "");
 
-    // if (plan !== "premium") {
-    //   await clerkClient.users.updateUserMetadata(userId, {
-    //     privateMetadata: {
-    //       free_usage: free_usage + 1,
-    //     },
-    //   });
-    // }
+		const prompt2 = `${prompt}`;
+		await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${prompt2}, ${secure_url},'image');`;
 
-    return res.status(200).json({ success: true, content: secure_url });
-  } catch (error) {
-    console.log("Error in generateArticle ", error);
-    return res.status(500).json({ success: false, message: error });
-  }
+		// if (plan !== "premium") {
+		//   await clerkClient.users.updateUserMetadata(userId, {
+		//     privateMetadata: {
+		//       free_usage: free_usage + 1,
+		//     },
+		//   });
+		// }
+
+		return res.status(200).json({ success: true, content: secure_url });
+	} catch (error) {
+		console.log("Error in remove object ", error);
+		return res.status(500).json({ success: false, message: error });
+	}
 };
 export const reviewResume = async (req: RequestWithClerk, res: Response) => {
-  console.log("review Resume called");
-  try {
-    const { userId } = getAuth(req);
-    const resume = req.file;
-    const plan = req.plan;
+	console.log("review Resume called");
+	try {
+		const { userId } = getAuth(req);
+		const resume = req.file;
+		const plan = req.plan;
 
-    if (plan !== "premium") {
-      return res.status(403).json({
-        success: false,
-        message: "Become a premium user to generate images :).",
-      });
-    }
+		if (plan !== "premium") {
+			return res.status(403).json({
+				success: false,
+				message: "Become a premium user to generate images :).",
+			});
+		}
 
-    if (resume.size > 5 * 1024 * 1024) {
-      res.status(400).json({
-        success: false,
-        message: "Resume file size exceeds allowed size 5MB",
-      });
-    }
+		if (resume.size > 5 * 1024 * 1024) {
+			res.status(400).json({
+				success: false,
+				message: "Resume file size exceeds allowed size 5MB",
+			});
+		}
 
-    const dataBuffer = fs.readFileSync(resume.path);
+		const dataBuffer = fs.readFileSync(resume.path);
 
-    const pdfData = await pdf(dataBuffer);
-    const prompt = `Review the following resume and provide constructive feedback on its strengths , weaknesses and areas for improvement. Resume Content\n\n: ${pdfData.text}`;
-    // console.log({ prompt });
+		const pdfData = await pdf(dataBuffer);
+		const prompt = `Review the following resume and provide constructive feedback on its strengths , weaknesses and areas for improvement. Resume Content\n\n: ${pdfData.text}`;
+		// console.log({ prompt });
 
-    // fs.writeFileSync("gemini-native-image.png", base64Image);
-    // console.log("Image saved as gemini-native-image.png");
+		// fs.writeFileSync("gemini-native-image.png", base64Image);
+		// console.log("Image saved as gemini-native-image.png");
 
-    const response = await ai.models.generateContent({
-      model: "gemma-3-27b-it",
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-        maxOutputTokens: 2000,
-      },
-    });
+		const response = await ai.models.generateContent({
+			model: "gemma-3-27b-it",
+			contents: prompt,
+			config: {
+				temperature: 0.7,
+				maxOutputTokens: 2000,
+			},
+		});
 
-    await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${"review the uploaded resume"}, ${response.text},'resume-review');`;
+		await sql` INSERT INTO creations (user_id, prompt, content, type) VALUES (${userId}, ${"review the uploaded resume"}, ${response.text},'resume-review');`;
 
-    // if (plan !== "premium") {
-    //   await clerkClient.users.updateUserMetadata(userId, {
-    //     privateMetadata: {
-    //       free_usage: free_usage + 1,
-    //     },
-    //   });
-    // }
+		// if (plan !== "premium") {
+		//   await clerkClient.users.updateUserMetadata(userId, {
+		//     privateMetadata: {
+		//       free_usage: free_usage + 1,
+		//     },
+		//   });
+		// }
 
-    return res.status(200).json({ success: true, content: response.text });
-  } catch (error) {
-    console.log("Error in generateArticle ", error);
-    return res.status(500).json({ success: false, message: error });
-  }
+		return res.status(200).json({ success: true, content: response.text });
+	} catch (error) {
+		console.log("Error in generateArticle ", error);
+		return res.status(500).json({ success: false, message: error });
+	}
 };
